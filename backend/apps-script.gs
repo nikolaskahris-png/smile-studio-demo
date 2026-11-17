@@ -6,7 +6,7 @@
  *        → type "Web app" → Execute as: Me → Who has access: Anyone → Deploy.
  */
 
-const SECRET = 'SET-YOUR-OWN-SECRET'; // must match SHEET_SECRET in the Worker // must match SHEET_SECRET in the Worker
+const SECRET = 'SET-YOUR-OWN-SECRET'; // must match SHEET_SECRET in the Worker
 const TZ = 'Europe/Athens';
 const SLOT_MIN = 30;
 // Opening hours per weekday (0 = Sunday ... 6 = Saturday). Missing day = closed.
