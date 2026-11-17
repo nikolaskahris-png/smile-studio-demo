@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smile Studio — AI Receptionist (live demo)</title>
+<meta name="description" content="Live demo of an AI receptionist chatbot that answers questions, books appointments into Google Sheets and hands off to a human.">
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#fff; --ink:#14181f; --muted:#5b6472; --line:#e3e6eb;
+    --brand:#0f766e; --brand-ink:#fff; --brand-soft:#e6f3f2; --warn:#fff6e0; --warn-ink:#7a5600;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+  .banner{background:var(--warn);color:var(--warn-ink);text-align:center;padding:8px 16px;font-size:13px;border-bottom:1px solid #f1e2b8}
+  header{max-width:1120px;margin:0 auto;padding:28px 20px 8px}
+  header h1{margin:0;font-size:26px;letter-spacing:-.01em}
+  header p{margin:6px 0 0;color:var(--muted);max-width:720px}
+  main{max-width:1120px;margin:0 auto;padding:16px 20px 40px;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px}
+  @media (max-width:860px){main{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .card h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0;padding:14px 16px;border-bottom:1px solid var(--line)}
+  /* chat */
+  .chat{display:flex;flex-direction:column;height:620px}
+  .chat-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .avatar{width:36px;height:36px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:700}
+  .chat-head b{display:block}
+  .chat-head small{color:var(--muted)}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:5px}
+  .log{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;background:#fbfcfd}
+  .msg{max-width:82%;padding:10px 13px;border-radius:14px;white-space:pre-wrap;word-wrap:break-word}
+  .bot{background:var(--card);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px}
+  .me{background:var(--brand);color:var(--brand-ink);align-self:flex-end;border-bottom-right-radius:4px}
+  .tag{align-self:flex-start;font-size:12px;color:var(--brand);background:var(--brand-soft);border-radius:999px;padding:3px 10px}
+  .typing{align-self:flex-start;color:var(--muted);font-size:13px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;padding:10px 16px 0}
+  .chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+  .chip:hover{border-color:var(--brand);color:var(--brand)}
+  form{display:flex;gap:8px;padding:12px 16px 16px}
+  input{flex:1;border:1px solid var(--line);border-radius:10px;padding:11px 12px;font:inherit}
+  input:focus{outline:2px solid var(--brand-soft);border-color:var(--brand)}
+  button.send{background:var(--brand);color:#fff;border:0;border-radius:10px;padding:0 18px;font:inherit;font-weight:600;cursor:pointer}
+  button.send:disabled{opacity:.5;cursor:default}
+  /* side */
+  .side{display:flex;flex-direction:column;gap:20px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:9px 16px;border-bottom:1px solid var(--line)}
+  th{font-size:12px;color:var(--muted);font-weight:600}
+  tr.new td{background:var(--brand-soft);transition:background 2s}
+  .empty{padding:16px;color:var(--muted)}
+  .live{float:right;font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0}
+  ul.how{margin:0;padding:14px 16px 16px 34px}
+  ul.how li{margin:6px 0}
+  footer{max-width:1120px;margin:0 auto;padding:0 20px 40px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<div class="banner">DEMO — Smile Studio is a fictional clinic. Please use made-up names and phone numbers. · Φανταστικό ιατρείο, χρησιμοποιήστε ψεύτικα στοιχεία.</div>
+
+<header>
+  <h1>AI receptionist for a dental clinic — live demo</h1>
+  <p>Ask about prices or opening hours, book an appointment, or ask to speak to a person. Bookings appear in the clinic's Google Sheet in real time (right). Works in English, Greek and other languages.</p>
+</header>
+
+<main>
+  <section class="card chat" aria-label="Chat">
+    <div class="chat-head">
+      <div class="avatar">S</div>
+      <div><b>Smile Studio</b><small><span class="dot"></span>AI receptionist · replies instantly</small></div>
+    </div>
+    <div class="log" id="log" aria-live="polite"></div>
+    <div class="chips" id="chips">
+      <button class="chip">How much is a cleaning?</button>
+      <button class="chip">Book a check-up for tomorrow</button>
+      <button class="chip">Θέλω ραντεβού για λεύκανση</button>
+      <button class="chip">Can I talk to a person?</button>
+    </div>
+    <form id="form">
+      <input id="input" autocomplete="off" maxlength="1000" placeholder="Type a message… / Γράψτε ένα μήνυμα…" aria-label="Message">
+      <button class="send" id="send">Send</button>
+    </form>
+  </section>
+
+  <div class="side">
+    <section class="card">
+      <h2>Bookings in Google Sheets <span class="live" id="live">live</span></h2>
+      <div id="bookings"><div class="empty">Loading…</div></div>
+    </section>
+    <section class="card">
+      <h2>What this bot does</h2>
+      <ul class="how">
+        <li>Answers from the clinic's own information (prices, hours, policies) — no made-up answers.</li>
+        <li>Checks real availability and books appointments without double-booking.</li>
+        <li>Saves leads (name, phone, email) for people who aren't ready to book.</li>
+        <li>Hands the conversation to a human when asked or when it doesn't know.</li>
+        <li>Can run on a website, WhatsApp or Telegram, with OpenAI, Claude or Gemini.</li>
+      </ul>
+    </section>
+  </div>
+</main>
+
+<footer>Built by Nikolas Kahris — AI chatbots &amp; automations for small businesses.</footer>
+
+<script>
+  // >>> After deploying the Cloudflare Worker, paste its URL here (no trailing slash):
+  const API = 'https://smile-studio-api.nikolaskahris.workers.dev';
+
+  const log = document.getElementById('log');
+  const form = document.getElementById('form');
+  const input = document.getElementById('input');
+  const send = document.getElementById('send');
+  const history = [];
+  const TOOL_LABEL = {
+    check_availability: 'Checked availability',
+    book_appointment: 'Booked in Google Sheets',
+    save_lead: 'Saved lead',
+    handoff_to_human: 'Passed to a team member',
+  };
+
+  function add(text, who) {
+    const el = document.createElement('div');
+    el.className = 'msg ' + who;
+    // Show **bold** as bold without ever inserting raw HTML.
+    String(text).split(/(\*\*[^*]+\*\*)/).forEach(part => {
+      if (/^\*\*[^*]+\*\*$/.test(part)) {
+        const b = document.createElement('b');
+        b.textContent = part.slice(2, -2);
+        el.appendChild(b);
+      } else {
+        el.appendChild(document.createTextNode(part.replace(/\*/g, '')));
+      }
+    });
+    log.appendChild(el);
+    log.scrollTop = log.scrollHeight;
+    return el;
+  }
+  function tag(text) {
+    const el = document.createElement('div');
+    el.className = 'tag';
+    el.textContent = '✓ ' + text;
+    log.appendChild(el);
+  }
+
+  const greeting = 'Hi! I’m the Smile Studio assistant. I can answer questions or book you an appointment. / Γεια σας! Πώς μπορώ να βοηθήσω;';
+  add(greeting, 'bot');
+  history.push({ role: 'assistant', text: greeting });
+
+  async function ask(text) {
+    if (!text.trim()) return;
+    document.getElementById('chips').style.display = 'none';
+    add(text, 'me');
+    history.push({ role: 'user', text });
+    input.value = '';
+    send.disabled = true;
+    const typing = document.createElement('div');
+    typing.className = 'typing';
+    typing.textContent = 'typing…';
+    log.appendChild(typing);
+    log.scrollTop = log.scrollHeight;
+    try {
+      const res = await fetch(API + '/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: history.slice(-16) }),
+      });
+      const data = await res.json();
+      typing.remove();
+      (data.actions || []).filter(a => a.ok && a.tool !== 'check_availability').forEach(a => tag(TOOL_LABEL[a.tool] || a.tool));
+      const reply = data.reply || 'Sorry, something went wrong. Please try again.';
+      add(reply, 'bot');
+      history.push({ role: 'assistant', text: reply });
+      if ((data.actions || []).some(a => a.tool === 'book_appointment' && a.ok)) loadBookings();
+    } catch (e) {
+      typing.remove();
+      add('Connection problem — please try again.', 'bot');
+    } finally {
+      send.disabled = false;
+      input.focus();
+    }
+  }
+
+  form.addEventListener('submit', e => { e.preventDefault(); ask(input.value); });
+  document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => ask(c.textContent)));
+
+  let seen = new Set();
+  async function loadBookings() {
+    try {
+      const data = await fetch(API + '/recent').then(r => r.json());
+      const rows = (data && data.bookings) || [];
+      const box = document.getElementById('bookings');
+      if (!rows.length) { box.innerHTML = '<div class="empty">No bookings yet — try booking one in the chat.</div>'; return; }
+      const first = seen.size === 0;
+      const table = document.createElement('table');
+      table.innerHTML = '<thead><tr><th>Patient</th><th>Service</th><th>Date</th><th>Time</th></tr></thead>';
+      const tb = document.createElement('tbody');
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        if (!first && !seen.has(r.id)) tr.className = 'new';
+        [r.name, r.service, r.date, r.time].forEach(v => { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); });
+        tb.appendChild(tr);
+        seen.add(r.id);
+      });
+      table.appendChild(tb);
+      box.replaceChildren(table);
+      document.getElementById('live').textContent = 'live · updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    } catch (e) { /* keep last table */ }
+  }
+  loadBookings();
+  setInterval(loadBookings, 10000);
+</script>
+</body>
+</html>
